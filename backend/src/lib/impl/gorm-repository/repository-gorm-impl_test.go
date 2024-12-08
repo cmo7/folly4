@@ -10,6 +10,7 @@ import (
 	"github.com/cmo7/folly4/src/lib/generics/filter"
 	"github.com/cmo7/folly4/src/lib/generics/order"
 	"github.com/cmo7/folly4/src/lib/generics/pagination"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -17,47 +18,63 @@ import (
 )
 
 type ParentEntity struct {
-	ID        common.ID `gorm:"type:char(36);primary_key"`
+	ID        uuid.UUID `gorm:"type:char(36);primary_key"`
 	Name      string
 	BirthDate time.Time     `gorm:"type:date"`
 	Children  []ChildEntity `gorm:"foreignKey:ParentID"`
 }
 
 type ChildEntity struct {
-	ID       common.ID `gorm:"type:char(36);primary_key"`
+	ID       uuid.UUID `gorm:"type:char(36);primary_key"`
 	Name     string
-	ParentID common.ID      `gorm:"type:char(36)"`
+	ParentID uuid.UUID      `gorm:"type:char(36)"`
 	Siblings []*ChildEntity `gorm:"many2many:child_entity_siblings"`
 }
 
 func (e *ParentEntity) BeforeCreate(tx *gorm.DB) error {
-	e.ID = common.NewID()
+	e.ID = uuid.New()
 	return nil
 }
 
 func (e *ChildEntity) BeforeCreate(tx *gorm.DB) error {
-	e.ID = common.NewID()
+	e.ID = uuid.New()
 	return nil
 }
 
-func (e ParentEntity) GetID() common.ID {
+func (e ParentEntity) GetID() uuid.UUID {
 	return e.ID
+}
+
+func (e *ParentEntity) SetID(id uuid.UUID) {
+	e.ID = id
+}
+
+func (e ParentEntity) GetEntityName() common.EntityName {
+	return common.EntityName("ParentEntity")
 }
 
 func (e ParentEntity) GetName() string {
 	return e.Name
 }
 
-func (e ChildEntity) GetID() common.ID {
+func (e ChildEntity) GetID() uuid.UUID {
 	return e.ID
+}
+
+func (e *ChildEntity) SetID(id uuid.UUID) {
+	e.ID = id
 }
 
 func (e ChildEntity) GetName() string {
 	return e.Name
 }
 
-var parentRepository *GormGenericRepository[ParentEntity]
-var childRepository *GormGenericRepository[ChildEntity]
+func (e ChildEntity) GetEntityName() common.EntityName {
+	return common.EntityName("ChildEntity")
+}
+
+var parentRepository *GormGenericRepository[*ParentEntity]
+var childRepository *GormGenericRepository[*ChildEntity]
 
 func setupDB() *gorm.DB {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
@@ -76,8 +93,11 @@ func setupDB() *gorm.DB {
 }
 
 func truncateDB(db *gorm.DB) {
-	db.Migrator().DropTable(&ChildEntity{}, &ParentEntity{})
-	db.AutoMigrate(&ParentEntity{}, &ChildEntity{})
+	tables, _ := db.Migrator().GetTables()
+	for _, table := range tables {
+		db.Exec("DELETE FROM " + table + ";")
+	}
+	//db.AutoMigrate(&ParentEntity{}, &ChildEntity{})
 }
 
 func setupTest(t *testing.T) {
@@ -94,8 +114,8 @@ func createContext(timeout time.Duration) context.Context {
 
 func TestMain(m *testing.M) {
 	db := setupDB()
-	parentRepository = NewGormGenericRepository[ParentEntity](db)
-	childRepository = NewGormGenericRepository[ChildEntity](db)
+	parentRepository = NewGormGenericRepository[*ParentEntity](db)
+	childRepository = NewGormGenericRepository[*ChildEntity](db)
 
 	code := m.Run()
 	os.Exit(code)
@@ -106,7 +126,7 @@ func TestGormGenericRepositoryCreateParent(t *testing.T) {
 
 	ctx := createContext(5 * time.Second)
 	parent := ParentEntity{Name: "Parent"}
-	result, err := parentRepository.Create(ctx, parent)
+	result, err := parentRepository.Create(ctx, &parent)
 
 	assert.Nil(t, err)
 	assert.Equal(t, "Parent", result.Name)
@@ -118,11 +138,11 @@ func TestGormGenericRepositoryCreateChild(t *testing.T) {
 	ctx := createContext(5 * time.Second)
 
 	parent := ParentEntity{Name: "Parent"}
-	createdParent, err := parentRepository.Create(ctx, parent)
+	createdParent, err := parentRepository.Create(ctx, &parent)
 	assert.Nil(t, err)
 
 	child := ChildEntity{Name: "Child", ParentID: createdParent.ID}
-	result, err := childRepository.Create(ctx, child)
+	result, err := childRepository.Create(ctx, &child)
 
 	assert.Nil(t, err)
 	assert.Equal(t, "Child", result.Name)
@@ -137,11 +157,11 @@ func TestGormGenericRepositoryFindParentWithChildren(t *testing.T) {
 	parent := ParentEntity{Name: "Parent"}
 	child := ChildEntity{Name: "Child"}
 
-	createdParent, err := parentRepository.Create(ctx, parent)
+	createdParent, err := parentRepository.Create(ctx, &parent)
 	assert.Nil(t, err)
 
 	child.ParentID = createdParent.ID
-	_, err = childRepository.Create(ctx, child)
+	_, err = childRepository.Create(ctx, &child)
 	assert.Nil(t, err)
 
 	var loadedParent ParentEntity
@@ -164,12 +184,12 @@ func TestGormGenericRepositoryPagination(t *testing.T) {
 	}
 
 	for _, p := range parents {
-		_, err := parentRepository.Create(ctx, p)
+		_, err := parentRepository.Create(ctx, &p)
 		assert.Nil(t, err)
 	}
 
 	pageable := pagination.Pageable{Page: 0, Size: 2}
-	page, err := parentRepository.FindAll(ctx, pageable, filter.Composite{Operator: filter.And, Filters: []filter.Filter{}}, nil, nil)
+	page, err := parentRepository.FindAll(ctx, pageable, filter.Composite{Operator: filter.LogicalAnd, Filters: []filter.Filter{}}, nil, nil)
 
 	assert.Nil(t, err)
 	assert.Equal(t, 2, len(page.Content))
@@ -189,7 +209,7 @@ func TestGormGenericRepositorySortByNameCases(t *testing.T) {
 	}
 
 	for _, p := range parents {
-		_, err := parentRepository.Create(ctx, p)
+		_, err := parentRepository.Create(ctx, &p)
 		assert.Nil(t, err)
 	}
 
@@ -214,7 +234,7 @@ func TestGormGenericRepositorySortByNameCases(t *testing.T) {
 				pageable = pagination.Pageable{Page: 0, Size: 10}
 			}
 
-			page, err := parentRepository.FindAll(ctx, pageable, filter.Composite{Operator: filter.And, Filters: []filter.Filter{}}, nil, tc.orderBy)
+			page, err := parentRepository.FindAll(ctx, pageable, filter.Composite{Operator: filter.LogicalAnd, Filters: []filter.Filter{}}, nil, tc.orderBy)
 
 			assert.Nil(t, err)
 			assert.Equal(t, tc.expectedLength, len(page.Content))
@@ -234,7 +254,7 @@ func TestGormGenericRepositoryTimeout(t *testing.T) {
 
 	ctx := createContext(0 * time.Millisecond) // Timeout immediately
 	parent := ParentEntity{Name: "Parent"}
-	_, err := parentRepository.Create(ctx, parent)
+	_, err := parentRepository.Create(ctx, &parent)
 
 	assert.NotNil(t, err)
 	assert.Contains(t, err.Error(), "context deadline exceeded")

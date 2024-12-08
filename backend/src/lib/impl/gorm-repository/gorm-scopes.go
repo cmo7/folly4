@@ -14,6 +14,13 @@ import (
 
 // scopePage recieves a Pageable and applies the limit and offset to the query.
 func scopePage(pageable pagination.Pageable) func(*gorm.DB) *gorm.DB {
+	// Validate the page and size
+	if pageable.Page < 1 {
+		pageable.Page = 1
+	}
+	if pageable.Size < 1 {
+		pageable.Size = 1
+	}
 	limit := pageable.Size
 	offset := pageable.Size * (pageable.Page - 1)
 	return func(db *gorm.DB) *gorm.DB {
@@ -57,11 +64,11 @@ func scopeFilter(f filter.Filter) func(*gorm.DB) *gorm.DB {
 
 func filterComposite(f filter.Composite) func(*gorm.DB) *gorm.DB {
 	switch f.Operator {
-	case filter.And:
+	case filter.LogicalAnd:
 		return andCompose(f.Filters)
-	case filter.Or:
+	case filter.LogicalOr:
 		return orCompose(f.Filters)
-	case filter.Not:
+	case filter.LogicalNot:
 		return notCompose(f.Filters)
 	}
 	return nil
@@ -73,7 +80,7 @@ func andCompose(filters []filter.Filter) func(*gorm.DB) *gorm.DB {
 			if f.IsComposite() {
 				db = db.Where(filterComposite(f.(filter.Composite))(db))
 			} else {
-				db = db.Where(compare(f.(filter.Leaf)), f.(filter.Leaf).Value)
+				db = db.Where(compare(f.(filter.Leaf))(db))
 			}
 		}
 		return db
@@ -86,7 +93,7 @@ func orCompose(filters []filter.Filter) func(*gorm.DB) *gorm.DB {
 			if f.IsComposite() {
 				db = db.Or(filterComposite(f.(filter.Composite))(db))
 			} else {
-				db = db.Or(compare(f.(filter.Leaf)), f.(filter.Leaf).Value)
+				db = db.Or(compare(f.(filter.Leaf))(db))
 			}
 		}
 		return db
@@ -99,40 +106,45 @@ func notCompose(filters []filter.Filter) func(*gorm.DB) *gorm.DB {
 			if f.IsComposite() {
 				db = db.Not(filterComposite(f.(filter.Composite))(db))
 			} else {
-				db = db.Not(compare(f.(filter.Leaf)), f.(filter.Leaf).Value)
+				db = db.Not(compare(f.(filter.Leaf))(db))
 			}
 		}
 		return db
 	}
 }
 
-func compare(Filter filter.Leaf) string {
-	switch Filter.Comparator {
-	case filter.Equal:
-		return Filter.Field + " = ?"
-	case filter.NotEqual:
-		return Filter.Field + " != ?"
-	case filter.GreaterThan:
-		return Filter.Field + " > ?"
-	case filter.GreaterThanOrEqual:
-		return Filter.Field + " >= ?"
-	case filter.LessThan:
-		return Filter.Field + " < ?"
-	case filter.LessThanOrEqual:
-		return Filter.Field + " <= ?"
-	case filter.Like:
-		return Filter.Field + " LIKE ?"
-	case filter.NotLike:
-		return Filter.Field + " NOT LIKE ?"
-	case filter.In:
-		return Filter.Field + " IN (?)"
-	case filter.NotIn:
-		return Filter.Field + " NOT IN (?)"
-	case filter.IsNull:
-		return Filter.Field + " IS NULL"
-	case filter.IsNotNull:
-		return Filter.Field + " IS NOT NULL"
-	default:
-		return " = ?"
+func compare(f filter.Leaf) func(*gorm.DB) *gorm.DB {
+	return func(db *gorm.DB) *gorm.DB {
+		if f.Value == nil {
+			return db
+		}
+		switch f.Comparator {
+		case filter.ComparatorEqual:
+			return db.Where(f.Field + " = ?")
+		case filter.ComparatorNotEqual:
+			return db.Where(f.Field + " != ?")
+		case filter.ComparatorGreaterThan:
+			return db.Where(f.Field + " > ?")
+		case filter.ComparatorGreaterThanOrEqual:
+			return db.Where(f.Field + " >= ?")
+		case filter.ComparatorLessThan:
+			return db.Where(f.Field + " < ?")
+		case filter.ComparatorLessThanOrEqual:
+			return db.Where(f.Field + " <= ?")
+		case filter.ComparatorLike:
+			return db.Where(f.Field + " LIKE ?")
+		case filter.ComparatorNotLike:
+			return db.Where(f.Field + " NOT LIKE ?")
+		case filter.ComparatorIn:
+			return db.Where(f.Field + " IN (?)")
+		case filter.ComparatorNotIn:
+			return db.Where(f.Field + " NOT IN (?)")
+		case filter.ComparatorIsNull:
+			return db.Where(f.Field + " IS NULL")
+		case filter.ComparatorIsNotNull:
+			return db.Where(f.Field + " IS NOT NULL")
+		default:
+			return db.Where(f.Field + " = ?")
+		}
 	}
 }

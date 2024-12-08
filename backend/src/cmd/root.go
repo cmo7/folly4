@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/cmo7/folly4/src/cmd/config"
+	"github.com/cmo7/folly4/src/cmd/serve"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -20,6 +21,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is ./conf)")
 	cobra.OnInitialize(initConfig)
 	rootCmd.AddCommand(config.ConfigCmd)
+	rootCmd.AddCommand(serve.ServeCmd)
 }
 
 func Execute() {
