@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/cmo7/folly4/src/lib/generics"
 	"github.com/cmo7/folly4/src/lib/generics/common"
 	"github.com/cmo7/folly4/src/lib/generics/filter"
 	"github.com/cmo7/folly4/src/lib/generics/order"
@@ -31,17 +32,20 @@ type Controller interface {
 
 // CrudController is a generic controller that provides CRUD functionality, compatible with the service.CrudService.
 // Every method returns an http.HandlerFunc that can be used to handle HTTP requests.
-type CrudController[E common.Entity] struct {
+
+// The controller uses a generics.Mapper to map entities to DTOs and vice versa.
+type CrudController[E common.Entity, D common.Entity] struct {
 	service.CrudService[E]
+	mapper generics.Mapper[E, D]
 }
 
-func NewController[E common.Entity](crudService service.CrudService[E]) *CrudController[E] {
-	return &CrudController[E]{
+func NewController[E common.Entity, D common.Entity](crudService service.CrudService[E]) *CrudController[E, D] {
+	return &CrudController[E, D]{
 		CrudService: crudService,
 	}
 }
 
-func (c *CrudController[E]) Create() http.HandlerFunc {
+func (c *CrudController[E, D]) Create() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse the request body.
 		var entity E
@@ -63,7 +67,7 @@ func (c *CrudController[E]) Create() http.HandlerFunc {
 	}
 }
 
-func (c *CrudController[E]) Find() http.HandlerFunc {
+func (c *CrudController[E, D]) Find() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
 		uid, err := uuid.Parse(id)
@@ -85,7 +89,7 @@ func (c *CrudController[E]) Find() http.HandlerFunc {
 	}
 }
 
-func (c *CrudController[E]) Update() http.HandlerFunc {
+func (c *CrudController[E, D]) Update() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
 		uid, err := uuid.Parse(id)
@@ -113,7 +117,7 @@ func (c *CrudController[E]) Update() http.HandlerFunc {
 	}
 }
 
-func (c *CrudController[E]) Delete() http.HandlerFunc {
+func (c *CrudController[E, D]) Delete() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
 		uid, err := uuid.Parse(id)
@@ -134,7 +138,7 @@ func (c *CrudController[E]) Delete() http.HandlerFunc {
 	}
 }
 
-func (c *CrudController[E]) FindAll() http.HandlerFunc {
+func (c *CrudController[E, D]) FindAll() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		pageable := extractPageableFromRequest(r)
 		filter := extractFilterFromRequest(r)
@@ -152,7 +156,7 @@ func (c *CrudController[E]) FindAll() http.HandlerFunc {
 	}
 }
 
-func (c *CrudController[E]) Count() http.HandlerFunc {
+func (c *CrudController[E, D]) Count() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		filter := extractFilterFromRequest(r)
 
@@ -167,7 +171,7 @@ func (c *CrudController[E]) Count() http.HandlerFunc {
 	}
 }
 
-func (c *CrudController[E]) Associate() http.HandlerFunc {
+func (c *CrudController[E, D]) Associate() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
 		uid, err := uuid.Parse(id)
@@ -195,7 +199,7 @@ func (c *CrudController[E]) Associate() http.HandlerFunc {
 	}
 }
 
-func (c *CrudController[E]) Dissociate() http.HandlerFunc {
+func (c *CrudController[E, D]) Dissociate() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
 		uid, err := uuid.Parse(id)
@@ -223,7 +227,7 @@ func (c *CrudController[E]) Dissociate() http.HandlerFunc {
 	}
 }
 
-func (c *CrudController[E]) Exists() http.HandlerFunc {
+func (c *CrudController[E, D]) Exists() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
 		uid, err := uuid.Parse(id)
@@ -243,7 +247,7 @@ func (c *CrudController[E]) Exists() http.HandlerFunc {
 	}
 }
 
-func (c *CrudController[E]) Random() http.HandlerFunc {
+func (c *CrudController[E, D]) Random() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		entity, err := c.CrudService.Random(r.Context())
 		if err != nil {
@@ -257,7 +261,7 @@ func (c *CrudController[E]) Random() http.HandlerFunc {
 	}
 }
 
-func (c *CrudController[E]) First() http.HandlerFunc {
+func (c *CrudController[E, D]) First() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		filter := extractFilterFromRequest(r)
 
@@ -272,7 +276,7 @@ func (c *CrudController[E]) First() http.HandlerFunc {
 	}
 }
 
-func (c *CrudController[E]) Combo() http.HandlerFunc {
+func (c *CrudController[E, D]) Combo() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		entities, err := c.CrudService.ComboBox(r.Context(), extractPageableFromRequest(r), extractFilterFromRequest(r), extractRelationsFromRequest(r), extractOrderBysFromRequest(r))
 		if err != nil {

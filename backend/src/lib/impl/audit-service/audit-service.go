@@ -24,10 +24,8 @@ func NewAuditService[E common.Entity, A audit.Audit](
 	auditRepository repository.Repository[A],
 ) *AuditService[E, A] {
 	service := &AuditService[E, A]{
-		CrudServiceWithHooks: service.NewCrudServiceWithHooks(
-			crudService,
-		),
-		auditRepository: auditRepository,
+		CrudServiceWithHooks: service.NewCrudServiceWithHooks(crudService),
+		auditRepository:      auditRepository,
 	}
 
 	// Add hooks to create audit logs for each action.

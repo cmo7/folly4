@@ -20,17 +20,17 @@ const (
 
 // CrudRouter is a generic router that provides routing functionality.
 // It is a wrapper around an http.ServeMux.
-type CrudRouter[E common.Entity] struct {
+type CrudRouter[E common.Entity, D common.Entity] struct {
 	*http.ServeMux
 	baseRoute  string
-	controller controller.CrudController[E]
+	controller controller.CrudController[E, D]
 }
 
 // NewRouter creates a new Router.
-func NewRouter[E common.Entity](controller controller.CrudController[E]) *CrudRouter[E] {
+func NewRouter[E common.Entity, D common.Entity](controller controller.CrudController[E, D]) *CrudRouter[E, D] {
 	var zero E
 	entityName := zero.GetEntityName()
-	r := CrudRouter[E]{
+	r := CrudRouter[E, D]{
 		ServeMux:   http.NewServeMux(),
 		baseRoute:  "/" + string(entityName),
 		controller: controller,
@@ -54,40 +54,40 @@ func NewRouter[E common.Entity](controller controller.CrudController[E]) *CrudRo
 }
 
 // GetBaseRoute returns the base route of the router.
-func (r *CrudRouter[E]) GetBaseRoute() string {
+func (r *CrudRouter[E, D]) GetBaseRoute() string {
 	return r.baseRoute
 }
 
-func (r *CrudRouter[E]) GetRoute(method HTTPMethod, route string) string {
+func (r *CrudRouter[E, D]) GetRoute(method HTTPMethod, route string) string {
 	return fmt.Sprintf("%s %s", method, r.baseRoute+route)
 }
 
 // AddRoute adds a route to the router.
-func (r *CrudRouter[E]) AddRoute(method HTTPMethod, route string, handler http.HandlerFunc) {
+func (r *CrudRouter[E, D]) AddRoute(method HTTPMethod, route string, handler http.HandlerFunc) {
 	r.HandleFunc(r.GetRoute(method, route), handler)
 }
 
-func (r *CrudRouter[E]) Get(route string, handler http.HandlerFunc) {
+func (r *CrudRouter[E, D]) Get(route string, handler http.HandlerFunc) {
 	r.AddRoute(HTTPMethodGet, route, handler)
 }
 
-func (r *CrudRouter[E]) Post(route string, handler http.HandlerFunc) {
+func (r *CrudRouter[E, D]) Post(route string, handler http.HandlerFunc) {
 	r.AddRoute(HTTPMethodPost, route, handler)
 }
 
-func (r *CrudRouter[E]) Put(route string, handler http.HandlerFunc) {
+func (r *CrudRouter[E, D]) Put(route string, handler http.HandlerFunc) {
 	r.AddRoute(HTTPMethodPut, route, handler)
 }
 
-func (r *CrudRouter[E]) Patch(route string, handler http.HandlerFunc) {
+func (r *CrudRouter[E, D]) Patch(route string, handler http.HandlerFunc) {
 	r.AddRoute(HTTPMethodPatch, route, handler)
 }
 
-func (r *CrudRouter[E]) Delete(route string, handler http.HandlerFunc) {
+func (r *CrudRouter[E, D]) Delete(route string, handler http.HandlerFunc) {
 	r.AddRoute(HTTPMethodDelete, route, handler)
 }
 
-func (r *CrudRouter[E]) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+func (r *CrudRouter[E, D]) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	r.ServeMux.ServeHTTP(w, req)
 }
 
@@ -99,7 +99,7 @@ func Stack(handlers ...http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func RouterStack(routers ...*CrudRouter[common.Entity]) *http.ServeMux {
+func RouterStack(routers ...*CrudRouter[common.Entity, common.Entity]) *http.ServeMux {
 	mux := http.NewServeMux()
 	for _, router := range routers {
 		mux.Handle(router.GetBaseRoute(), router)

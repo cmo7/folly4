@@ -28,6 +28,10 @@ const (
 	OperationReject  Operation = "REJECT"
 )
 
+func (o Operation) String() string {
+	return string(o)
+}
+
 // Permission is an interface that represents a permission.
 // It provides methods to retrieve the permission's ID, name, and description.
 type Permission interface {
