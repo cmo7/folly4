@@ -23,11 +23,11 @@ const (
 type CrudRouter[E common.Entity, D common.Entity] struct {
 	*http.ServeMux
 	baseRoute  string
-	controller controller.CrudController[E, D]
+	controller *controller.CrudController[E, D]
 }
 
 // NewRouter creates a new Router.
-func NewRouter[E common.Entity, D common.Entity](controller controller.CrudController[E, D]) *CrudRouter[E, D] {
+func NewRouter[E common.Entity, D common.Entity](controller *controller.CrudController[E, D]) *CrudRouter[E, D] {
 	var zero E
 	entityName := zero.GetEntityName()
 	r := CrudRouter[E, D]{

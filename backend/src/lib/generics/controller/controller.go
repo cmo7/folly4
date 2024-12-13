@@ -39,9 +39,10 @@ type CrudController[E common.Entity, D common.Entity] struct {
 	mapper generics.Mapper[E, D]
 }
 
-func NewController[E common.Entity, D common.Entity](crudService service.CrudService[E]) *CrudController[E, D] {
+func NewController[E common.Entity, D common.Entity](crudService service.CrudService[E], mapper generics.Mapper[E, D]) *CrudController[E, D] {
 	return &CrudController[E, D]{
 		CrudService: crudService,
+		mapper:      mapper,
 	}
 }
 

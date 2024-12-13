@@ -64,15 +64,15 @@ type Audit interface {
 	SetUserAgent(userAgent string)
 }
 
-type AuditContextKey struct{}
+type auditContextKey struct{}
 
 func WithAudit(ctx context.Context, audit Audit) context.Context {
-	return context.WithValue(ctx, AuditContextKey{}, audit)
+	return context.WithValue(ctx, auditContextKey{}, audit)
 }
 
 func GetAudit[A Audit](ctx context.Context) A {
 	var zero A
-	audit, ok := ctx.Value(AuditContextKey{}).(A)
+	audit, ok := ctx.Value(auditContextKey{}).(A)
 	if !ok {
 		return zero
 	}

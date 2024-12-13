@@ -1,4 +1,4 @@
-package connect
+package database
 
 import (
 	"fmt"
@@ -37,6 +37,22 @@ func init() {
 	viper.SetDefault("database.name", "folly")
 	viper.SetDefault("database.engine", "sqlite")
 	viper.SetDefault("database.file", "folly.db")
+}
+
+func ConnectWithConfig(config *gorm.Config, connectionData *ConnectionData) (*gorm.DB, error) {
+	var connection *gorm.DB
+	var err error
+	switch connectionData.Engine {
+	case MySQL:
+		connection, err = connectMySQL(connectionData, config)
+	case SQLite:
+		connection, err = connectSQLite(connectionData, config)
+	case Postgres:
+		connection, err = connectPostgres(connectionData, config)
+	default:
+		connection, err = nil, fmt.Errorf("unsupported engine: %s", connectionData.Engine)
+	}
+	return connection, err
 }
 
 func Connect(config *gorm.Config) (*gorm.DB, error) {
